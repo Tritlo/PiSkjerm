@@ -17,21 +17,15 @@ vt = inkyphat.Image.open("vt.png")
 font = inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P, fontwidth)
 bigfont = inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P, 14)
 
-def clear(color=inkyphat.WHITE):
-  for x in range(0,inkyphat.WIDTH):
-    for y in range(0, inkyphat.HEIGHT):
-      inkyphat.putpixel((x,y),color)
 
 def printlines(msg, pos = None, color=inkyphat.BLACK):
-  offset = 0
   lines = msg.splitlines()
   if pos is not None:
     x,y = pos
   else:
     x,y = (2, inkyphat.HEIGHT//2 - fontheight*len(lines)//2)
-  for l in lines:
-    inkyphat.text((x,y+offset),l,color, font)
-    offset += fontheight + linespace
+  for i, l in enumerate(lines):
+    inkyphat.text((x,y+ i*(fontheight + linespace)),l,color, font)
 
 def printBusTimes(times):
    prefix = ["82:","Rosa:", "158:"]
@@ -47,14 +41,11 @@ def printBusTimes(times):
    inkyphat.clear()
    inkyphat.text((inkyphat.WIDTH//2 - 14*fontwidth//2,2)
                 , "Strætóferðir", inkyphat.RED, bigfont)
-   printlines(bt) #,color=inkyphat.RED)
-   vtc = ((inkyphat.WIDTH - 10*14 -vt.size[0] - 10)//2  ,inkyphat.HEIGHT-2-14)
+   printlines(bt)
+   vtc = ((inkyphat.WIDTH - 10*14 -vt.size[0] - 10)//2, inkyphat.HEIGHT-2-14)
    inkyphat.text( (vtc[0]+vt.size[0]+2,vtc[1]-4)
                 , "Västtrafik", inkyphat.RED, bigfont)
-   ti = inkyphat.ink
-   inkyphat.ink = inkyphat.RED
    inkyphat.paste(vt,((vtc[0],vtc[1]-vt.size[1]+14-2)))
-   inkyphat.ink = ti
    inkyphat.show()
 
 

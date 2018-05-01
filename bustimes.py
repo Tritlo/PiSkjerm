@@ -25,23 +25,26 @@ def getToken():
 
 
 def getInfo(stopId, track='A', token=None):
-    date, time = tuple(datetime.now().strftime("%Y-%m-%d %H:%M").split(" "))
+    now = datetime.now()
+    date, time = tuple(now.strftime("%Y-%m-%d %H:%M").split(" "))
     params = {"stopId": stopId, "date": date, "time": time, "timeSpan": 59}
     urlBase = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard?id={stopId}&date={date}&time={time}&timeSpan={timeSpan}&maxDeparturesPerLine=2&format=json"
     url = urlBase.format(**params)
     token = getToken() if not token else token
     req = request.Request(url, headers={"Authorization": "Bearer {token}".format(token=token)})
     resp = json.loads(request.urlopen(req).read().decode('utf8'))
-    ds = resp['DepartureBoard']['Departure']
-    deps = [ds] if type(ds) is dict else ds
-    toRes = lambda dep: {'name': dep['sname'], 'track': dep['track'], 'time': dep['rtTime'], 'date': dep['rtDate'], 'direction':dep['direction']}
-    isTrack = lambda d: d['track'] == track
-    now = datetime.now()
-    def howLong(d):
-        until = (datetime.strptime(" ".join([d['date'], d['time']]), "%Y-%m-%d %H:%M") - now).seconds//60
-        d['until'] = until
-        return d
-    return list(map(howLong, map(toRes, filter(isTrack, deps))))
+    try:
+        ds = resp['DepartureBoard']['Departure']
+        deps = [ds] if type(ds) is dict else ds
+        toRes = lambda dep: {'name': dep['sname'], 'track': dep['track'], 'time': dep['rtTime'], 'date': dep['rtDate'], 'direction':dep['direction']}
+        isTrack = lambda d: d['track'] == track
+        def howLong(d):
+            until = (datetime.strptime(" ".join([d['date'], d['time']]), "%Y-%m-%d %H:%M") - now).seconds//60
+            d['until'] = until
+            return d
+        return list(map(howLong, map(toRes, filter(isTrack, deps))))
+    except:
+        return []
 
 
 def getBusTimes():
