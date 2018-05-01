@@ -45,7 +45,7 @@ def printBusTimes(times):
      op.append(" ".join(map(toL5, s)))
    bt = "\n".join(op)
    inkyphat.clear()
-   td = datetime.now().strftime("%Y-%m-%d %H:%M") 
+   td = datetime.now().strftime("%Y-%m-%d %H:%M")
    inkyphat.text(((inkyphat.WIDTH-16*fontwidth)//2, 18), td, inkyphat.RED, font)
    inkyphat.text((inkyphat.WIDTH//2 - 14*fontwidth//2,2)
                 , "Strætóferðir", inkyphat.RED, bigfont)
