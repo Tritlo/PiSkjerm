@@ -4,6 +4,7 @@ import inkyphat
 import bustimes
 import time
 from datetime import datetime, timedelta
+import logging
 
 
 fontheight = 12
@@ -15,8 +16,12 @@ inkyphat.set_rotation(180)
 vt = inkyphat.Image.open("vt.png")
 
 font = inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P, fontwidth)
-bigfont = inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P, 14)
 
+bigfont = inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P, 14)
+logger = logging.getLogger(__name__)
+
+logLevel = logging.ERROR
+logger.setLevel(logLevel)
 
 def printlines(msg, pos = None, color=inkyphat.BLACK):
   lines = msg.splitlines()
@@ -53,13 +58,13 @@ if __name__ == "__main__":
   frequency = timedelta(0,60)
   while True:
     now = datetime.now()
-    print("Waking up at {now}".format(now=now.strftime("%Y-%m-%d %H:%M")))
-    print("Fetching bus departures...")
+    logger.info("Waking up at {now}".format(now=now.strftime("%Y-%m-%d %H:%M")))
+    logger.info("Fetching bus departures...")
     bt = bustimes.getBusTimes()
-    print("Bus times are: {}".format(bt))
-    print("Outputting bus departures...")
+    logger.info("Bus times are: {}".format(bt))
+    logger.info("Outputting bus departures...")
     printBusTimes(bt)
     now_again = datetime.now()
     seconds_until = max((now+frequency - now_again).seconds, 0)
-    print("Sleeping for {}secs...".format(seconds_until))
+    logger.info("Sleeping for {}secs...".format(seconds_until))
     time.sleep(seconds_until)

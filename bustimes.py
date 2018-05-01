@@ -2,6 +2,7 @@ from urllib import request
 import json
 import os
 from base64 import b64encode
+import logging
 
 from datetime import datetime
 lvvg = 9021014004663000
@@ -10,12 +11,13 @@ authKey = os.getenv('VASTTRAFIKKEY')
 authSecret = os.getenv('VASTTRAFIKSECRET')
 
 authToken = b64encode("{k}:{s}".format(k=authKey,s=authSecret).encode('utf8')).decode('utf8')
-print(authKey, authSecret, authToken)
 
 authData = b"grant_type=client_credentials"
 authUrl = "https://api.vasttrafik.se:443/token"
 
-
+logger = logging.getLogger(__name__)
+logLevel = logging.ERROR
+logger.setLevel(logLevel)
 
 def getToken():
     authReq = request.Request(authUrl, data=authData, headers={"Authorization": "Basic {}".format(authToken)})
@@ -43,16 +45,20 @@ def getInfo(stopId, track='A', token=None):
             d['until'] = until
             return d
         return list(map(howLong, map(toRes, filter(isTrack, deps))))
-    except:
+    except KeyError:
+        # If the board is empty,
+        # we get a key error.
+        return []
+    except Exception as err:
+        logger.error("{}:{} when handling {}".format(type(err), err, resp))
         return []
 
-
 def getBusTimes():
-   print("Fetching token...")
+   logger.info("Fetching token...")
    token = getToken()
-   print("Fetching Lövviksvägen...")
+   logger.info("Fetching Lövviksvägen...")
    lvgRes = getInfo(lvvg, token=token)
-   print("Fetching Hovås Nedre...")
+   logger.info("Fetching Hovås Nedre...")
    hvsRes = getInfo(hvsnedre, token=token)
    getTimes = lambda name, res: list(map(lambda d: d['until'], filter(lambda d: d['name'] == name, res)))
    r82 = getTimes('82', lvgRes)[:2]
@@ -62,4 +68,4 @@ def getBusTimes():
 
 
 if __name__ == "__main__":
-    print(getBusTimes())
+    logger.info(getBusTimes())
