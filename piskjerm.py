@@ -5,6 +5,7 @@ import bustimes
 import time
 from datetime import datetime, timedelta
 import logging
+from bustimes import Either
 
 from urllib.error import HTTPError
 
@@ -34,13 +35,19 @@ def printlines(msg, pos = None, color=inkyphat.BLACK):
     inkyphat.text((x,y+ i*(fontheight + linespace)),l,color, font)
 
 def printBusTimes(times):
-   prefix = ["82:","Rosa:", "158:"]
+   prefix = ["82:","Rosa:", bustimes.Either("158:","82B:")]
    m = "min"
    op = []
    toL5 = lambda s: " "*(max(5-len(s),0)) + s
    for i,ts in enumerate(times):
-     s = [prefix[i], "-","-"]
-     for j,t in enumerate(ts):
+     if type(ts) is bustimes.Either:
+       pf = prefix[i].left if ts.left else prefix[i].right
+       next_times = ts.left if ts.left else ts.right
+     else:
+       pf = prefix[i]
+       next_times = ts
+     s = [pf, "-","-"]
+     for j,t in enumerate(next_times):
        s[j+1] = str(t) + m
      op.append(" ".join(map(toL5, s)))
    bt = "\n".join(op)

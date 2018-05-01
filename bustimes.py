@@ -74,20 +74,35 @@ def getInfo(stopId, track='A', token=None):
         logger.error("{}:{} when handling {}".format(type(err), err, resp))
         return []
 
+
+class Either(object):
+    left = None
+    right = None
+    def __init__(self, left=None, right=None):
+        self.left = left
+        self.right = right
+        assert(left or right)
+
 def getBusTimes(token = None):
    logger.info("Fetching token...")
    token = getToken() if not token else token
    logger.info("Fetching Lövviksvägen...")
    lvgRes = getInfo(lvvg, token=token)
+   lvgBkRes = getInfo(lvvg, track='B', token=token)
    logger.info("Fetching Hovås Nedre...")
    hvsRes = getInfo(hvsnedre, token=token)
    getTimes = lambda name, res: list(map(lambda d: d['until'],
                                          filter(lambda d: d['name'] == name,
                                                 res)))
    r82 = getTimes('82', lvgRes)[:2]
+   r82Bk = getTimes('82', lvgBkRes)[:2]
    rRosa = getTimes('ROSA', hvsRes)[:2]
    r158 = getTimes('158', hvsRes)[:2]
-   return [r82, rRosa, r158]
+   if r158:
+     rLast = Either(left=r158)
+   else:
+     rLast = Either(right=r82Bk)
+   return [r82, rRosa, rLast]
 
 
 if __name__ == "__main__":
