@@ -48,7 +48,7 @@ def printBusTimes(times):
        next_times = ts
      s = [pf, "-","-"]
      for j,t in enumerate(next_times):
-       s[j+1] = str(t) + m
+       s[j+1] = "Núna!" if t == 0 else str(t) + m
      op.append(" ".join(map(toL5, s)))
    bt = "\n".join(op)
    inkyphat.clear()
