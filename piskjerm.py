@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta
 import logging
 
+from urllib.error import HTTPError
 
 fontheight = 12
 fontwidth = fontheight
@@ -44,6 +45,8 @@ def printBusTimes(times):
      op.append(" ".join(map(toL5, s)))
    bt = "\n".join(op)
    inkyphat.clear()
+   td = datetime.now().strftime("%Y-%m-%d %H:%M") 
+   inkyphat.text(((inkyphat.WIDTH-16*fontwidth)//2, 18), td, inkyphat.RED, font)
    inkyphat.text((inkyphat.WIDTH//2 - 14*fontwidth//2,2)
                 , "Strætóferðir", inkyphat.RED, bigfont)
    printlines(bt)
@@ -56,11 +59,22 @@ def printBusTimes(times):
 
 if __name__ == "__main__":
   frequency = timedelta(0,60)
+  token = None
   while True:
     now = datetime.now()
     logger.info("Waking up at {now}".format(now=now.strftime("%Y-%m-%d %H:%M")))
     logger.info("Fetching bus departures...")
-    bt = bustimes.getBusTimes()
+    token = bustimes.getToken() if not token else token
+    try:
+      bt = bustimes.getBusTimes(token)
+    except HTTPError as err:
+      # If the code is 401 forbidden, we need to refresh our token
+      if err.code == 401:
+        token = bustimes.getToken()
+        bt = bustimes.getBusTimes(token)
+      else:
+        bt = [[],[],[]]
+        logger.error("{}:{}".format(type(err),err))
     logger.info("Bus times are: {}".format(bt))
     logger.info("Outputting bus departures...")
     printBusTimes(bt)

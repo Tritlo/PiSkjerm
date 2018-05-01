@@ -53,9 +53,9 @@ def getInfo(stopId, track='A', token=None):
         logger.error("{}:{} when handling {}".format(type(err), err, resp))
         return []
 
-def getBusTimes():
+def getBusTimes(token = None):
    logger.info("Fetching token...")
-   token = getToken()
+   token = getToken() if not token else token
    logger.info("Fetching Lövviksvägen...")
    lvgRes = getInfo(lvvg, token=token)
    logger.info("Fetching Hovås Nedre...")
