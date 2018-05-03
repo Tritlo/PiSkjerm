@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+dist-newstyle/
+
+
 # Distribution / packaging
 .Python
 env/

@@ -1,10 +1,12 @@
-{-# OPTIONS_GHC -frefinement-level-hole-fits=2 -fno-max-valid-hole-fits -funclutter-valid-hole-fits #-}
+{-# OPTIONS_GHC -frefinement-level-hole-fits=2 -fno-max-valid-hole-fits
+                -funclutter-valid-hole-fits  #-}
 module BusTimes where
 
 import System.Environment
-import Network.HTTP.Headers
+import Network.Wreq
 
-import Data.ByteString.Base64
+import qualified Data.ByteString.Base64 as B64
+import Data.ByteString.Char8
 
 getAuthInfo :: IO (String, String)
 -- First we have to read the secrets from the environment,
@@ -17,22 +19,41 @@ getAuthInfo :: IO (String, String)
 --                  return (secret, key)
 -- One of the matches is getEnv, which sounds like what
 -- we want. Let's try that:
-getAuthInfo = do secret <- getEnv "VASTTRAFIKSECRET"
-                 key <- getEnv "VASTTRAFIKKEY"
-                 return (secret, key)
+getAuthInfo = do key <- getEnv "VASTTRAFIKKEY"
+                 secret <- getEnv "VASTTRAFIKSECRET"
+                 return (key, secret)
 -- It works!
 
--- Now we need to construct the authentication head.
--- Let's add Network.HTTP.Headers (seems reasonable)
-authHeader :: String -> Header
--- authHeader token = _
--- it suggests mkHeader (_ :: HeaderName) (_ :: String),
--- so let's try
--- authHeader token = mkHeader _ token
--- That suggests a lot, so let's look through all with
--- -fno-max-valid-hole-fits and -funclutter-valid-hole-fits
--- authHeader token = mkHeader _ token
--- HdrAuthorization is in the list, so let's use that!
-authHeader token = mkHeader HdrAuthorization token
+  where
+-- The token is the base64 encoded string "key:secret",
+-- and then "Basic " prepended to that.
+authToken :: String -> String -> ByteString
+authToken key secret = pack $ "Basic " ++ (encodeToken $ key ++ ":" ++ secret)
+  where
+    -- We need to base64 encode this authorization,
+    -- so let's use the base64-bytesting package.
+    encodeToken :: String -> String
+    encodeToken token = result
+      where
+        -- First we need to get to bytestring
+        toBS :: String -> ByteString
+        -- toBs = _
+        -- pack has the right type and sounds reasonable, let's use that!
+        toBS = pack
+        -- Next we need to turn the bytestring into base64 string
+        b64ed :: ByteString
+        -- b64ed = _ $ toBs token
+        -- B64.encode sounds like what we need!
+        b64ed = B64.encode $ toBS token
+        -- And finally, we need to turn it back into a string
+        result :: String
+        -- result = _ b64ed
+        -- unpack should to the trick!
+        result = unpack b64ed
 
--- But we need to base64 encode our header,
+-- Now, let's try to fetch a token!
+-- We know that we want a get request with some auth header, but how do we
+-- get these options? Let's ask GHC:
+getToken :: ByteString -> IO (Response ByteString)
+getToken auth = getWith opts "https://api.vasttrafik.se:443/token"
+  where opts = default & header "Authorization" .~ [auth]
