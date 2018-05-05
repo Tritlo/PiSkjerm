@@ -8,6 +8,9 @@ packages: ./
 keep-going: True
 allow-newer: all
 
+package cryptonite
+  flags: -integer-gmp
+
 repository hackage.mobilehaskell
   url: http://hackage.mobilehaskell.org/
   secure: True
