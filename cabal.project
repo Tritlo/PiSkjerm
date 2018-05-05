@@ -2,7 +2,8 @@
 
 with-compiler: /home/ghc/inplace/bin/ghc-stage2
 
-packages: .
+packages: ./
+          hs-memory/
 
 repository head.hackage
    url: http://head.hackage.haskell.org/
