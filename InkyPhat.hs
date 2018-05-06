@@ -41,7 +41,7 @@ readValue cmd =
      lift $ hFlushAll stdout
      sendCommand cmd 
      val <- lift $ hGetLine stdout
-     putStrLn val
+     lift $ putStrLn val
      return $ read val
 
 
