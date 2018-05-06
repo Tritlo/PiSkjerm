@@ -9,8 +9,8 @@ import Data.Default
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Types
-import System.Time
-import System.Locale
+import Data.Time
+import Data.Time.Format.ISO8601
 
 import GHC.Generics (Generic)
 
@@ -19,20 +19,21 @@ import Data.List (nub)
 -- import qualified Data.ByteString.Base64 as B64
 import Data.ByteString.Char8 (ByteString, pack, unpack)
 
-getAuthInfo :: IO (String, String)
+getAuthCredentials :: IO (String, String)
 -- First we have to read the secrets from the environment,
 -- so we add System.Environment to the import list and try
 -- getSecret = _
 -- one of he matches is the getEnv function!
 -- Let's use that and get the key and secret
--- getAuthInfo = do secret <- _a "VASTTRAFIKSECRET"
---                  key <- _b "VASTTRAFIKKEY"
---                  return (secret, key)
+-- getAuthCredentials = do key <- _b "VASTTRAFIKKEY"
+--                  secret <- _a "VASTTRAFIKSECRET"
+--                  return (key, secret)
+--
 -- One of the matches is getEnv, which sounds like what
 -- we want. Let's try that:
-getAuthInfo = do key <- getEnv "VASTTRAFIKKEY"
-                 secret <- getEnv "VASTTRAFIKSECRET"
-                 return (key, secret)
+getAuthCredentials = do key <- getEnv "VASTTRAFIKKEY"
+                        secret <- getEnv "VASTTRAFIKSECRET"
+                        return (key, secret)
 -- It works!
 
 -- -- The token is the base64 encoded string "key:secret",
@@ -72,7 +73,7 @@ data TokenResponse = TR { scope :: String
                         } deriving (Show, Generic, FromJSON)
 
 getToken :: IO TokenResponse
-getToken = runReq def $ do (key, secret) <- liftIO $ getAuthInfo
+getToken = runReq def $ do (key, secret) <- liftIO $ getAuthCredentials
                            let auth = basicAuth (pack key) (pack secret)
                                url = https "api.vasttrafik.se" /: "token"
                                -- We need a body, but how? Let's ask!
@@ -113,10 +114,10 @@ type Token = String
 type BusStop = Int
 
 getDateTime :: IO (String, String)
-getDateTime = do now <- getClockTime >>= toCalendarTime
+getDateTime = do now <- zonedTimeToLocalTime <$> getZonedTime
                  return (toDate now, toTime now)
-  where toDate = formatCalendarTime defaultTimeLocale "%Y-%m-%d"
-        toTime = formatCalendarTime defaultTimeLocale "%H:%M"
+  where toDate = iso8601Show . localDay 
+        toTime = Prelude.take 5 . iso8601Show . localTimeOfDay
 
 getBusTimes :: BusStop -> Token -> IO BusResponse
 getBusTimes stop token = runReq def $

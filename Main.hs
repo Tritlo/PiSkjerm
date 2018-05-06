@@ -1,9 +1,11 @@
+{-# LANGUAGE TypeApplications #-}
 module Main where
 
 import BusTimes
 import InkyPhat
 
 import Data.Maybe
+import Data.Time
 
 löviksVägen :: BusStop
 löviksVägen = 9021014004663000
@@ -53,15 +55,18 @@ leftpad c i n = replicate (n - length i) c ++ i
 rightpad :: a -> [a] -> Int -> [a]
 rightpad c i n = i ++ replicate (n - length i) c 
 
-renderBusLine :: BusLine -> String
-renderBusLine bl@(BL _ _ dp) =
+renderBusLine :: TimeOfDay -> BusLine -> String
+renderBusLine now bl@(BL _ _ dp) =
    concatMap to5 $ (displayNames bl ++ ":"):dpts
  where to5 s = leftpad ' ' s 5
        dpts = rightpad "-" (map toDp dp) 2
-       toDp _ = "asd"
+       toDp t = lt - nowSecs 
+        where lt = timeOfDayToTime $ read @TimeOfDay t
+              nowSecs = timeOfDayToTime now
       
 main :: IO ()
 main = do 
+    (date, time) <- getDateTime
     runInky $ do setup
                  printBusTimes ["82: - -", "ROSA: - -"]
     token <- access_token <$> getToken
@@ -69,7 +74,7 @@ main = do
     hvs <- getBusTimes hovåsNedre token
     print lvg
     print hvs
-    print $ map renderBusLine $ interestingLines $ getLines lvg <> getLines hvs
+    print $ map (renderBusLine $ read @TimeOfDay time) $ interestingLines $ getLines lvg <> getLines hvs
 
     runInky $ do setup
                  printBusTimes ["82: - -", "ROSA: - -"]
