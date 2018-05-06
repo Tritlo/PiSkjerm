@@ -16,7 +16,7 @@ import GHC.Generics (Generic)
 
 import Data.List (nub)
 
--- import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Base64 as B64
 import Data.ByteString.Char8 (ByteString, pack, unpack)
 
 getAuthCredentials :: IO (String, String)
@@ -36,31 +36,30 @@ getAuthCredentials = do key <- getEnv "VASTTRAFIKKEY"
                         return (key, secret)
 -- It works!
 
--- -- The token is the base64 encoded string "key:secret",
--- -- and then "Basic " prepended to that.
--- authToken :: String -> String -> ByteString
--- authToken key secret = pack $ "Basic " ++ (encodeToken $ key ++ ":" ++ secret)
---   where
---     -- We need to base64 encode this authorization,
---     -- so let's use the base64-bytesting package.
---     encodeToken :: String -> String
---     encodeToken token = result
---       where
---         -- First we need to get to bytestring
---         toBS :: String -> ByteString
---         -- toBs = _
---         -- pack has the right type and sounds reasonable, let's use that!
---         toBS = pack
---         -- Next we need to turn the bytestring into base64 string
---         b64ed :: ByteString
---         -- b64ed = _ $ toBs token
---         -- B64.encode sounds like what we need!
---         b64ed = B64.encode $ toBS token
---         -- And finally, we need to turn it back into a string
---         result :: String
---         -- result = _ b64ed
---         -- unpack should to the trick!
---         result = unpack b64ed
+-- The token is the base64 encoded string "key:secret",
+authToken :: String -> String -> String
+authToken key secret = encodeToken $ key ++ ":" ++ secret
+  where
+    -- We need to base64 encode this authorization,
+    -- so let's use the base64-bytesting package.
+    encodeToken :: String -> String
+    encodeToken token = result
+      where
+        -- First we need to get to bytestring
+        toBS :: String -> ByteString
+        -- toBs = _
+        -- pack has the right type and sounds reasonable, let's use that!
+        toBS = pack
+        -- Next we need to turn the bytestring into base64 string
+        b64ed :: ByteString
+        -- b64ed = _ $ toBs token
+        -- B64.encode sounds like what we need!
+        b64ed = B64.encode $ toBS token
+        -- And finally, we need to turn it back into a string
+        result :: String
+        -- result = _ b64ed
+        -- unpack should to the trick!
+        result = unpack b64ed
 
 -- Now, let's try to fetch a token!
 -- We know that we want a get request with some auth header, but how do we
@@ -71,6 +70,9 @@ data TokenResponse = TR { scope :: String
                         , expires_in:: Int
                         , access_token :: String
                         } deriving (Show, Generic, FromJSON)
+
+
+          
 
 getToken :: IO TokenResponse
 getToken = runReq def $ do (key, secret) <- liftIO $ getAuthCredentials
@@ -93,13 +95,6 @@ data DepartureBoard = DB { departure :: Maybe [Departure] } deriving Show
 instance FromJSON DepartureBoard where
   parseJSON = withObject "DepartureBoard" $ \v -> DB <$> v .: "Departure"
 
--- type BusTime = DateTime
--- type BusDate = DateTime
-
--- instance FromJSON BusTime where
---   parseJSON = withText "BusTime" $ parseDateTime "%H:%M"
--- instance FromJSON BusDate where
---   parseJSON = withText "BusDate" $ parseDateTime "%Y-%m-%d"
 
 data Departure = DP { direction :: String
                     , track :: String
@@ -127,11 +122,12 @@ getBusTimes stop token = runReq def $
   where url = https "api.vasttrafik.se" /: "bin" /: "rest.exe" /: "v2" /: "departureBoard"
         auth = oAuth2Bearer $ pack token
         params date time = "id" =: stop
-                        <> "maxDeparturesPerLine" =: (2 :: Integer)
-                        <> "format" =: ("json" :: String)
-                        <> "timeSpan" =: (59 :: Integer)
-                        <>  "date" =: date
-                        <>  "time" =: time
+                           <> "maxDeparturesPerLine" =: (2 :: Integer)
+                           <> "format" =: ("json" :: String)
+                           <> "timeSpan" =: (59 :: Integer)
+                           <>  "date" =: date
+                           <>  "time" =: time
+
 data BusLine = BL { name :: String
                   , track :: String
                   , departures :: [String] } deriving (Show, Eq)

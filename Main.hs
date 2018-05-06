@@ -8,6 +8,9 @@ import Data.Maybe
 import Data.Time
 import Data.List (intercalate)
 import Control.Monad.Reader (lift)
+import Data.Aeson
+import Data.ByteString.Lazy.Char8 (pack)
+import Control.Concurrent
 
 löviksVägen :: BusStop
 löviksVägen = 9021014004663000
@@ -97,18 +100,45 @@ updateDisplay img times
       ; printLogo img
       ; display }
 
+-- | We use these to get the information via Python,
+-- since the network libraries segfault on the pi.
+pyGetToken :: InkyIO (Maybe TokenResponse)
+pyGetToken = do (key, secret) <- lift getAuthCredentials 
+                let auth = authToken key secret
+                    url = "https://api.vasttrafik.se/token"
+                    body = "grant_type=client_credentials"
+                decode . pack <$> urlRequest url [] (Basic auth) body
+
+pyGetBusTimes :: (String, String) -> BusStop -> Token -> InkyIO (Maybe BusResponse)
+pyGetBusTimes (date, time) stop token =
+    decode . pack <$> urlRequest url params (Bearer token)  ""
+  where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
+        auth = (Bearer token)
+        params = [("id",show stop)
+                 , ("maxDeparturesPerLine", show 2)
+                 , ("format","json")
+                 , ("timeSpan", show 59)
+                 , ("date", date)
+                 , ("time", time)]
+
+loop :: Image -> InkyIO ()
+loop img =
+  do (date, time) <- lift $ getDateTime
+     token <- fmap access_token <$> pyGetToken
+     case token of 
+       Just token ->
+         do stops <- catMaybes <$>
+                       mapM (flip (pyGetBusTimes (date,time)) token)
+                         [löviksVägen, hovåsNedre]
+            let now = read @TimeOfDay (time ++ ":00")
+                interesting = interestingLines $ concatMap getLines stops
+                busTimes = map (renderBusLine now) interesting
+            updateDisplay img busTimes 
+       Nothing -> return ()
+     lift $ threadDelay $ 60 * 1000000 
+     loop img
 
 main :: IO ()
-main = do 
-    (date, time) <- getDateTime
-    token <- access_token <$> getToken
-    lvg <- getBusTimes löviksVägen token
-    hvs <- getBusTimes hovåsNedre token
-    print lvg
-    print hvs
-    let busTimes = map (renderBusLine $ read @TimeOfDay (time ++ ":00"))
-                     $ interestingLines $ getLines lvg <> getLines hvs
-    runInky $ do img <- setup
-                 updateDisplay img busTimes 
+main = runInky $ setup >>= loop
 
  

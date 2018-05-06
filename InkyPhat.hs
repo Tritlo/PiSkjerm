@@ -7,6 +7,9 @@ module InkyPhat (
     image, size, dimensions
     -- Types
     , Color (..) , Font (..), Image
+
+    -- Python networking hack
+    , AuthHeader (..), urlRequest 
     ) where 
 
 
@@ -38,9 +41,38 @@ readValue cmd =
      sendCommand cmd 
      lift $ read <$> hGetLine stdout
 
+
+-- The Nice request libraries segfault on the pi,
+-- so we'll just use the already available python interpreter
+data AuthHeader = Basic String | Bearer String
+
+instance Show AuthHeader where
+  show (Basic s) = show ("Basic " ++ s)
+  show (Bearer s) = show ("Bearer " ++ s)
+
+urlRequest :: String -> [(String,String)] ->
+              AuthHeader -> String -> InkyIO String
+urlRequest url params auth body
+ = do (stdin, stdout) <- ask
+      lift $ hFlushAll stdout
+      sendCommand readCmd
+      -- Python adds "'" to denote a string,
+      -- so we drop those.
+      lift $ tail . init <$>  hGetLine stdout
+ where reqCmd = "request.Request(" ++ intercalate "," args ++ ")"
+       readCmd = "request.urlopen(" ++ reqCmd ++ ").read().decode('utf8')"
+       args = [show urlArg
+              , "headers={'Authorization':" ++ show auth ++ "}"]
+              ++ (if null body then [] else  ["data=b" ++ show body])
+       urlArg = if null params then url
+                else (url ++ "?"++ concatMap paramToUrl params)
+       paramToUrl (name,arg) = name ++ "=" ++ arg
+
+
 initialCommands :: [String]
 initialCommands
-    = [ "import inkyphat" ]
+    = [ "import inkyphat"
+      , "from urllib import request"]
 
 data Color = Black | White | Red deriving (Show)
 
@@ -100,7 +132,7 @@ dimensions = readValue "(inkyphat.WIDTH, inkyphat.HEIGHT)"
 
 runInky :: InkyIO a -> IO a 
 runInky action =
-  do (Just stdin, Just stdout , _, proc) <- createProcess $ cp { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
+  do (Just stdin, Just stdout , Just std_err, proc) <- createProcess $ cp { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
      r <- flip runReaderT (stdin, stdout) $
             do mapM_ sendCommand initialCommands
                action

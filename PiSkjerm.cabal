@@ -22,6 +22,7 @@ executable PiSkjerm
   build-depends:       base ^>=4.11
                      , transformers ^>= 0.5.5
                      , bytestring ^>= 0.10.8
+                     , base64-bytestring ^>=1.0.0
                      , aeson ^>= 1.3.1
                      , data-default ^>= 0.7.1
                      , time ^>= 1.9.1
