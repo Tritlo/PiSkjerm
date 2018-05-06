@@ -31,7 +31,8 @@ type InkyIO = ReaderT (Handle, Handle) IO
 sendCommand :: String -> InkyIO ()
 sendCommand cmd =
     do (stdin, _) <- ask
-       lift $ do hPutStr stdin (cmd ++ "\n")
+       lift $ do print cmd
+                 hPutStr stdin (cmd ++ "\n")
                  hFlushAll stdin
 
 readValue :: Read a => String -> InkyIO a
@@ -39,7 +40,9 @@ readValue cmd =
   do (stdin, stdout) <- ask
      lift $ hFlushAll stdout
      sendCommand cmd 
-     lift $ read <$> hGetLine stdout
+     val <- lift $ hGetLine stdout
+     putStrLn val
+     return $ read val
 
 
 -- The Nice request libraries segfault on the pi,
