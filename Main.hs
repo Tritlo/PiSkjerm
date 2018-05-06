@@ -1,16 +1,19 @@
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications, OverloadedStrings #-}
 module Main where
 
 import BusTimes
 import InkyPhat
 
 import Data.Maybe
-import Data.Time
-import Data.List (intercalate)
 import Control.Monad.Reader (lift)
 import Data.Aeson
-import Data.ByteString.Lazy.Char8 (pack)
+import Data.Time
+import qualified Data.ByteString.Lazy.Char8 as B (pack)
+import Data.Text hiding (map, concatMap, zip, length, replicate, any, filter)
+import qualified Data.Text as T
 import Control.Concurrent
+
+import Prelude hiding (intercalate)
 
 löviksVägen :: BusStop
 löviksVägen = 9021014004663000
@@ -27,7 +30,7 @@ linespace :: Int
 linespace = 2
 
 
-displayNames :: BusLine -> String
+displayNames :: BusLine -> Text
 displayNames (BL "82" "A" _) = "82"
 displayNames (BL "82" "B" _) = "82B"
 displayNames (BL "ROSA" _ _) = "ROSA"
@@ -44,24 +47,24 @@ interestingLines lines = filter isInteresting lines
         || (n == "158" && t == "A")
 
 -- From Gabriel Gonzalez's tweet.
-leftpad :: a -> [a] -> Int -> [a]
-leftpad c i n = replicate (n - length i) c ++ i
+leftpad :: Char -> Text -> Int -> Text
+leftpad c i n = T.replicate (n - T.length i) (singleton c) <> i
 
 rightpad :: a -> [a] -> Int -> [a]
 rightpad c i n = i ++ replicate (n - length i) c 
 
-renderBusLine :: TimeOfDay -> BusLine -> String
+renderBusLine :: TimeOfDay -> BusLine -> Text
 renderBusLine now bl@(BL _ _ dp) =
-   unwords $ map to5 $ (displayNames bl ++ ":"):dpts
+   T.unwords $ map to5 $ [(displayNames bl <> ":")] <> dpts
  where to5 s = leftpad ' ' s 5
        dpts = rightpad "-" (map toDp dp) 2
        toDp t = msg 
          where mins = floor (lt - nowSecs) `div` 60
-               msg = if mins > 0 then (show mins) ++ "min" else "Núna!"
-               lt = timeOfDayToTime $ read @TimeOfDay (t ++ ":00")
+               msg = if mins > 0 then (pack $ show mins) <> "min" else "Núna!"
+               lt = timeOfDayToTime $ read @TimeOfDay (t <> ":00")
                nowSecs = timeOfDayToTime now
 
-printBusTimes :: [String] -> InkyIO ()
+printBusTimes :: [Text] -> InkyIO ()
 printBusTimes msgs =
   do (inkyW, inkyH) <- dimensions
      let (x,y) = (2, (inkyH `div` 2 - fontheight*(length msgs) `div` 2))
@@ -71,10 +74,10 @@ printBusTimes msgs =
   where pos = fromMaybe
 
 printTime :: InkyIO ()
-printTime = do (date, time) <- lift getDateTime
+printTime = do (date, time) <- pyGetTime
                (inkyW, _) <- dimensions
                let pos = ((inkyW - 16*fontwidth) `div` 2,18)
-               text pos (unwords [date, time]) (Just Red) Nothing
+               text pos (T.unwords [date, time]) (Just Red) Nothing
 
 printName :: InkyIO ()
 printName = do (inkyW, _) <- dimensions
@@ -92,9 +95,10 @@ printLogo img
       paste img posLogo
   
 
-updateDisplay :: Image -> [String] -> InkyIO ()
+updateDisplay :: Image -> [Text] -> InkyIO ()
 updateDisplay img times
- = do { printName
+ = do { clear
+      ; printName
       ; printTime
       ; printBusTimes times
       ; printLogo img
@@ -107,30 +111,31 @@ pyGetToken = do (key, secret) <- lift getAuthCredentials
                 let auth = authToken key secret
                     url = "https://api.vasttrafik.se/token"
                     body = "grant_type=client_credentials"
-                decode . pack <$> urlRequest url [] (Basic auth) body
+                decode . B.pack . T.unpack <$> urlRequest url [] (Basic auth) body
 
-pyGetBusTimes :: (String, String) -> BusStop -> Token -> InkyIO (Maybe BusResponse)
+pyGetBusTimes :: (Text, Text) -> BusStop -> Token -> InkyIO (Maybe BusResponse)
 pyGetBusTimes (date, time) stop token =
-    decode . pack <$> urlRequest url params (Bearer token)  ""
+    decode . B.pack . T.unpack <$> urlRequest url params (Bearer token)  ""
   where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
         auth = (Bearer token)
-        params = [("id",show stop)
-                 , ("maxDeparturesPerLine", show 2)
+        params = [("id", pack $ show stop)
+                 , ("maxDeparturesPerLine", pack $ show 2)
                  , ("format","json")
-                 , ("timeSpan", show 59)
+                 , ("timeSpan", pack $ show 59)
                  , ("date", date)
                  , ("time", time)]
 
+
 loop :: Image -> InkyIO ()
 loop img =
-  do (date, time) <- lift $ getDateTime
+  do (date, time) <- pyGetTime
      token <- fmap access_token <$> pyGetToken
      case token of 
        Just token ->
          do stops <- catMaybes <$>
                        mapM (flip (pyGetBusTimes (date,time)) token)
                          [löviksVägen, hovåsNedre]
-            let now = read @TimeOfDay (time ++ ":00")
+            let now = read @TimeOfDay ( unpack time ++ ":00")
                 interesting = interestingLines $ concatMap getLines stops
                 busTimes = map (renderBusLine now) interesting
             updateDisplay img busTimes 
