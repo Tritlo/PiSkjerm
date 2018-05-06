@@ -9,11 +9,15 @@ import Control.Monad.Reader (lift)
 import Data.Aeson
 import Data.Time
 import qualified Data.ByteString.Lazy.Char8 as B (pack)
-import Data.Text hiding (map, concatMap, zip, length, replicate, any, filter)
+import Data.Text hiding ( map, concatMap, zip
+                        , length, replicate, any
+                        , filter, null)
 import qualified Data.Text as T
 import Control.Concurrent
+import Data.Text.Encoding as E
 
 import Prelude hiding (intercalate)
+import Debug.Trace
 
 löviksVägen :: BusStop
 löviksVägen = 9021014004663000
@@ -111,11 +115,14 @@ pyGetToken = do (key, secret) <- lift getAuthCredentials
                 let auth = authToken key secret
                     url = "https://api.vasttrafik.se/token"
                     body = "grant_type=client_credentials"
-                decode . B.pack . T.unpack <$> urlRequest url [] (Basic auth) body
+                decodeStrict . E.encodeUtf8 <$> urlRequest url [] (Basic auth) body
 
 pyGetBusTimes :: (Text, Text) -> BusStop -> Token -> InkyIO (Maybe BusResponse)
 pyGetBusTimes (date, time) stop token =
-    decode . B.pack . T.unpack <$> urlRequest url params (Bearer token)  ""
+   do res <- E.encodeUtf8 <$> urlRequest url params (Bearer token)  ""
+      case eitherDecodeStrict res of
+        Left err -> lift $ print err >> return Nothing
+        Right v -> return v
   where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
         auth = (Bearer token)
         params = [("id", pack $ show stop)
@@ -135,10 +142,14 @@ loop img =
          do stops <- catMaybes <$>
                        mapM (flip (pyGetBusTimes (date,time)) token)
                          [löviksVägen, hovåsNedre]
+            lift $ print stops
             let now = read @TimeOfDay ( unpack time ++ ":00")
                 interesting = interestingLines $ concatMap getLines stops
                 busTimes = map (renderBusLine now) interesting
-            updateDisplay img busTimes 
+                msg = if null busTimes
+                      then ["Engar ferðir núna!"]
+                      else busTimes
+            updateDisplay img msg
        Nothing -> return ()
      lift $ threadDelay $ 60 * 1000000 
      loop img

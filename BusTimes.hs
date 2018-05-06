@@ -71,10 +71,10 @@ data BusResponse = BR { departureBoard :: DepartureBoard} deriving Show
 instance FromJSON BusResponse where
   parseJSON = withObject "BusResponse" $ \v -> BR <$> v .: "DepartureBoard"
 
-data DepartureBoard = DB { departure :: Maybe [Departure] } deriving Show
+data DepartureBoard = DB { departure :: [Departure] } deriving Show
 
 instance FromJSON DepartureBoard where
-  parseJSON = withObject "DepartureBoard" $ \v -> DB <$> v .: "Departure"
+  parseJSON = withObject "DepartureBoard" $ \v -> DB <$> v .:? "Departure" .!= []
 
 
 data Departure = DP { direction :: String
@@ -94,8 +94,7 @@ data BusLine = BL { name :: String
                   , departures :: [String] } deriving (Show, Eq)
 
 getLines :: BusResponse -> [BusLine]
-getLines (BR (DB Nothing)) = []
-getLines (BR (DB (Just dep))) = concatMap getLine names
+getLines (BR (DB dep)) = concatMap getLine names
   where 
     names = nub $ map sname dep
     getLine name = map toLine tracks
