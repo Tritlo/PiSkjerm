@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -frefinement-level-hole-fits=2 -fno-max-valid-hole-fits
                 -funclutter-valid-hole-fits  -fno-max-refinement-hole-fits #-}
-{-# LANGUAGE OverloadedStrings, DeriveAnyClass, DeriveGeneric, TypeSynonymInstances #-}
+{-# LANGUAGE OverloadedStrings, DeriveAnyClass, DeriveGeneric, TypeSynonymInstances, DuplicateRecordFields #-}
 module BusTimes where
 
 import System.Environment
@@ -14,8 +14,10 @@ import System.Locale
 
 import GHC.Generics (Generic)
 
+import Data.List (nub)
+
 -- import qualified Data.ByteString.Base64 as B64
-import Data.ByteString.Char8
+import Data.ByteString.Char8 (ByteString, pack, unpack)
 
 getAuthInfo :: IO (String, String)
 -- First we have to read the secrets from the environment,
@@ -129,6 +131,21 @@ getBusTimes stop token = runReq def $
                         <> "timeSpan" =: (59 :: Integer)
                         <>  "date" =: date
                         <>  "time" =: time
--- urlBase = "https://api.vasttrafik.se/bin/rest.exe/v2/"\
---             "departureBoard?id={stopId}&date={date}&time={time}"\
---             "&timeSpan={timeSpan}&maxDeparturesPerLine=2&format=json"
+data BusLine = BL { name :: String
+                  , track :: String
+                  , departures :: [String] } deriving (Show, Eq)
+
+getLines :: BusResponse -> [BusLine]
+getLines (BR (DB Nothing)) = []
+getLines (BR (DB (Just dep))) = concatMap getLine names
+  where 
+    names = nub $ map sname dep
+    getLine name = map toLine tracks
+      where 
+        dtrack = track :: Departure -> String
+        tracks = nub $ map dtrack $ filter ((== name) . sname) dep
+        -- filter fusion, yay!
+        getTrack tr = filter ((== name) . sname)
+                        . filter ((== tr) . dtrack )
+        concreteTime d = case rtTime d of Just t -> t; _ -> time d
+        toLine tr = BL name tr $ map concreteTime $ getTrack tr dep
