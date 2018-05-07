@@ -1,18 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
-module InkyPhat (
-    runInky, InkyIO,
-    -- commands
-    text, paste, display, setRotation, clear,
+module InkyPhat ( runInky, InkyIO
+                  -- commands
+                , text, paste, display, setRotation, clear
 
-    -- Data
-    image, size, dimensions
-    -- Types
-    , Color (..) , Font (..), Image
-
-    -- Python networking hack
-    , AuthHeader (..), urlRequest, pyGetTime
-    ) where
+                -- Data
+                , image, size, dimensions, readString
+                -- Types
+                , Color (..) , Font (..), Image
+    ) where 
 
 
 import System.Process
@@ -26,18 +22,9 @@ import Data.Text hiding (map, null)
 import qualified Data.Text as T
 
 import Prelude hiding (hPutStr, hPutStrLn, hGetLine, putStrLn,)
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.Text.Encoding as E
 import Data.Text.IO
 
 type InkyIO = ReaderT (Handle, Handle) IO
-
-pyGetTime :: InkyIO (Text, Text)
-pyGetTime = do d <- readString "datetime.now().strftime('%Y-%m-%d')"
-               t <- readString "datetime.now().strftime('%H:%M')"
-               return (d,t)
-
 
 -- To avoid issues with FFI, we'll just go the easy
 -- interpeter way.
@@ -66,31 +53,6 @@ readString cmd =
      val <- lift $ hGetLine stdout
      dlog val
      return val
-
-
--- The Nice request libraries segfault on the pi,
--- so we'll just use the already available python interpreter
-data AuthHeader = Basic String | Bearer String
-
-instance Show AuthHeader where
-  show (Basic s) = show ("Basic " <> s)
-  show (Bearer s) = show ("Bearer " <> s)
-
-urlRequest :: Text -> [(Text,Text)] ->
-              AuthHeader -> ByteString -> InkyIO Text
-urlRequest url params auth body
- = do (stdin, stdout) <- ask
-      lift $ hFlushAll stdout
-      readString readCmd
- where reqCmd = "request.Request(" <> intercalate "," args <> ")"
-       readCmd = "request.urlopen(" <> reqCmd <> ").read().decode('utf8')"
-       args = [ (pack $ show urlArg)
-              , "headers={'Authorization':" <> (pack $ show auth) <> "}"]
-              <> (if B.null body then mempty else ["data=b'" <> E.decodeUtf8 body <> "'"])
-       urlArg = if null params then url
-                else (url <> "?"<> ( intercalate "&" $ map paramToUrl params))
-       paramToUrl (name,arg) = name <> "=" <> arg
-
 
 initialCommands :: [Text]
 initialCommands
