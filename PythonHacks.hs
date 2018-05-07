@@ -62,7 +62,7 @@ pyGetBusTimes token stop =
         Right v -> return v
   where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
         auth = Bearer token
-        params date time = [("id", pack $ show stop)
+        params date time = [ ("id", pack $ show stop)
                            , ("maxDeparturesPerLine", pack $ show 2)
                            , ("format","json")
                            , ("timeSpan", pack $ show 59)

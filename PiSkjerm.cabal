@@ -30,6 +30,8 @@ executable PiSkjerm
   if flag(python_hacks)
    other-modules:  PythonHacks
    cpp-options: -DPYTHON_HACKS
+  else
+   other-modules:  ReqNetworking
   if flag(debug)
    cpp-options: -DDEBUG
   -- other-extensions:
@@ -44,7 +46,9 @@ executable PiSkjerm
                      , process ^>= 1.6.3
                      , mtl ^>= 2.2
                      -- Networking
-                     , data-default ^>= 0.7.1
-                     , req ^>= 1.0.0
   -- hs-source-dirs:
+  if !flag(python_hacks)
+    build-depends: data-default ^>= 0.7.1
+                 , req ^>= 1.0.0
+                 , retry ^>= 0.7.4
   default-language:    Haskell2010

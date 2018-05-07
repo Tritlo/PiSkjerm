@@ -19,6 +19,8 @@ import System.Environment
 
 # if PYTHON_HACKS
 import PythonHacks
+# else
+import ReqNetworking
 # endif
 
 getToken :: InkyIO (Maybe TokenResponse)
@@ -62,10 +64,10 @@ displayNames _ = "??"
 
 interestingLines :: [BusLine] -> [BusLine]
 interestingLines lines = filter isInteresting lines
- where has158 = any ((==) "158" . name) lines
+ where no158A = not $ any (\(BL n t _) -> (n == "158" && t == "A")) lines
        isInteresting (BL n t _ ) =
-           (n == "82" && t == "A") 
-        || (not has158 && n == "82" && t == "B")
+           (n == "82" && t == "A")
+        || (n == "82" && t == "B" && no158A)
         || (n == "ROSA" && t == "A")
         || (n == "158" && t == "A")
 
@@ -141,10 +143,8 @@ loop img =
                         else busTimes
             updateDisplay img msg
        _ -> return ()
-     lift $ threadDelay $ 60 * 1000000
+     lift $ threadDelay $ 60 * 1000 * 1000
      loop img
 
 main :: IO ()
 main = runInky $ setup >>= loop
-
- 
