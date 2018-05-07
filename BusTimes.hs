@@ -11,6 +11,15 @@ import GHC.Generics (Generic)
 
 import Data.List (nub)
 
+-- Req networking
+import Network.HTTP.Req
+import Data.Default
+import Control.Monad.IO.Class
+import Data.Time
+import Data.Time.Format.ISO8601
+import Data.Text (Text)
+import qualified Data.Text as T
+
 import qualified Data.ByteString.Base64 as B64
 import Data.ByteString.Char8 (ByteString, pack, unpack)
 
@@ -95,14 +104,45 @@ data BusLine = BL { name :: String
 
 getLines :: BusResponse -> [BusLine]
 getLines (BR (DB dep)) = concatMap getLine names
-  where 
-    names = nub $ map sname dep
-    getLine name = map toLine tracks
-      where 
-        dtrack = track :: Departure -> String
-        tracks = nub $ map dtrack $ filter ((== name) . sname) dep
-        -- filter fusion, yay!
-        getTrack tr = filter ((== name) . sname)
-                        . filter ((== tr) . dtrack )
-        concreteTime d = case rtTime d of Just t -> t; _ -> time d
-        toLine tr = BL name tr $ map concreteTime $ getTrack tr dep
+  where names = nub $ map sname dep
+        getLine name = map toLine tracks
+          where dtrack = track :: Departure -> String
+                tracks = nub $ map dtrack $ filter ((== name) . sname) dep
+                -- filter fusion, yay!
+                getTrack tr = filter ((== name) . sname)
+                                . filter ((== tr) . dtrack )
+                concreteTime d = case rtTime d of Just t -> t; _ -> time d
+                toLine tr = BL name tr $ map concreteTime $ getTrack tr dep
+
+-- Req networking
+
+hsGetToken :: IO (Maybe TokenResponse)
+hsGetToken = fmap Just $ runReq def $
+  do (key, secret) <- liftIO getAuthCredentials
+     let auth = basicAuth (pack key) (pack secret)
+         url = https "api.vasttrafik.se" /: "token"
+         -- We need a body, but how? Let's ask!
+         body :: ReqBodyBs
+         -- body = _ ("grant_type=client_credentials" :: ByteString)
+         body = ReqBodyBs "grant_type=client_credentials"
+     responseBody <$> req POST url body jsonResponse auth
+
+hsGetDateTime :: IO (Text, Text)
+hsGetDateTime =
+ do now <- zonedTimeToLocalTime <$> getZonedTime
+    return (toDate now, toTime now)
+  where toDate = T.pack . iso8601Show . localDay
+        toTime = T.pack . Prelude.take 5 . iso8601Show . localTimeOfDay
+
+hsGetBusTimes :: Token -> BusStop -> IO (Maybe BusResponse)
+hsGetBusTimes token stop = fmap Just $ runReq def $
+  do (date, time) <- liftIO hsGetDateTime
+     responseBody <$> req GET url NoReqBody jsonResponse (auth <> params date time)
+  where url = https "api.vasttrafik.se" /: "bin" /: "rest.exe" /: "v2" /: "departureBoard"
+        auth = oAuth2Bearer $ pack token
+        params date time = "id" =: stop
+                        <> "maxDeparturesPerLine" =: (2 :: Integer)
+                        <> "format" =: ("json" :: String)
+                        <> "timeSpan" =: (59 :: Integer)
+                        <>  "date" =: date
+                        <>  "time" =: time
