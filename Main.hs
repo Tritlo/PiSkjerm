@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, OverloadedStrings #-}
+{-# LANGUAGE TypeApplications, OverloadedStrings, CPP #-}
 module Main where
 
 import BusTimes
@@ -15,12 +15,33 @@ import Data.Text hiding ( map, concatMap, zip
 import qualified Data.Text as T
 import Control.Concurrent
 import Data.Text.Encoding as E
+import System.Environment
+
+# if PYTHON_HACKS
+import PythonHacks
+# endif
+
+getToken :: InkyIO (Maybe TokenResponse)
+getDateTime :: InkyIO (Text, Text)
+getBusTimes :: Token -> BusStop -> InkyIO (Maybe BusResponse)
+# if PYTHON_HACKS
+getToken = pyGetToken
+getDateTime = pyGetDateTime
+getBusTimes = pyGetBusTimes
+#else
+getToken = lift hsGetToken
+getDateTime = lift hsGetDateTime
+getBusTimes t s = lift (hsGetBusTimes t s)
+#endif
 
 
 löviksVägen :: BusStop
 löviksVägen = 9021014004663000
 hovåsNedre :: BusStop
 hovåsNedre = 9021014003235000
+
+nearby :: [BusStop]
+nearby = [löviksVägen, hovåsNedre]
 
 setup :: InkyIO Image
 setup = setRotation 180 >> image "vt" "vt.png"
@@ -76,7 +97,7 @@ printBusTimes msgs =
   where pos = fromMaybe
 
 printTime :: InkyIO ()
-printTime = do (date, time) <- pyGetTime
+printTime = do (date, time) <- getDateTime
                (inkyW, _) <- dimensions
                let pos = ((inkyW - 16*fontwidth) `div` 2,18)
                text pos (T.unwords [date, time]) (Just Red) Nothing
@@ -95,7 +116,6 @@ printLogo img
           posLogo = (vx, vy-logoH+14-2)
       text posText "Västtrafik" (Just Red) (Just (Font 14))
       paste img posLogo
-  
 
 updateDisplay :: Image -> [Text] -> InkyIO ()
 updateDisplay img times
@@ -106,51 +126,22 @@ updateDisplay img times
       ; printLogo img
       ; display }
 
--- | We use these to get the information via Python,
--- since the network libraries segfault on the pi.
-pyGetToken :: InkyIO (Maybe TokenResponse)
-pyGetToken = do (key, secret) <- lift getAuthCredentials 
-                let auth = authToken key secret
-                    url = "https://api.vasttrafik.se/token"
-                    body = "grant_type=client_credentials"
-                decodeStrict . E.encodeUtf8 <$> urlRequest url [] (Basic auth) body
-
-pyGetBusTimes :: (Text, Text) -> BusStop -> Token -> InkyIO (Maybe BusResponse)
-pyGetBusTimes (date, time) stop token =
-   do res <- E.encodeUtf8 <$> urlRequest url params (Bearer token)  ""
-      case eitherDecodeStrict res of
-        Left err -> do lift $ do putStrLn (err ++ " when decoding:")
-                                 print res
-                       return Nothing
-        Right v -> return v
-  where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
-        auth = Bearer token
-        params = [("id", pack $ show stop)
-                 , ("maxDeparturesPerLine", pack $ show 2)
-                 , ("format","json")
-                 , ("timeSpan", pack $ show 59)
-                 , ("date", date)
-                 , ("time", time)]
-
-
 loop :: Image -> InkyIO ()
 loop img =
-  do (date, time) <- pyGetTime
-     token <- fmap access_token <$> pyGetToken
-     case token of
+  do (date, time) <- getDateTime
+     mb_token <- fmap access_token <$> getToken
+     case mb_token of
        Just token ->
-         do stops <- catMaybes <$>
-                       mapM (flip (pyGetBusTimes (date,time)) token)
-                         [löviksVägen, hovåsNedre]
+         do stops <- catMaybes <$> mapM (getBusTimes token) nearby
             let now = read @TimeOfDay ( unpack time ++ ":00")
                 interesting = interestingLines $ concatMap getLines stops
                 busTimes = map (renderBusLine now) interesting
                 msg = if null busTimes
-                      then ["Engar ferðir núna!"]
-                      else busTimes
+                        then ["Engar ferðir núna!"]
+                        else busTimes
             updateDisplay img msg
-       Nothing -> return ()
-     lift $ threadDelay $ 60 * 1000000 
+       _ -> return ()
+     lift $ threadDelay $ 60 * 1000000
      loop img
 
 main :: IO ()

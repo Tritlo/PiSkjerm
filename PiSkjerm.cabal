@@ -19,9 +19,19 @@ flag debug
   description:      Turn on debug messages
   default:          False
 
+flag python_hacks 
+  description:      Use the pyhon interpeter to do time and network requests
+  default:          False
+
 executable PiSkjerm
   main-is:             Main.hs
-  other-modules:       BusTimes, InkyPhat
+  other-modules:       BusTimes
+                    , InkyPhat
+  if flag(python_hacks)
+   other-modules:  PythonHacks
+   cpp-options: -DPYTHON_HACKS
+  if flag(debug)
+   cpp-options: -DDEBUG
   -- other-extensions:
   build-depends:       base ^>=4.11
                      , transformers ^>= 0.5.5
@@ -33,5 +43,8 @@ executable PiSkjerm
                        -- InkyPhat
                      , process ^>= 1.6.3
                      , mtl ^>= 2.2
+                     -- Networking
+                     , data-default ^>= 0.7.1
+                     , req ^>= 1.0.0
   -- hs-source-dirs:
   default-language:    Haskell2010
