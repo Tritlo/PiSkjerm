@@ -119,7 +119,9 @@ pyGetBusTimes :: (Text, Text) -> BusStop -> Token -> InkyIO (Maybe BusResponse)
 pyGetBusTimes (date, time) stop token =
    do res <- E.encodeUtf8 <$> urlRequest url params (Bearer token)  ""
       case eitherDecodeStrict res of
-        Left err -> lift $ print err >> return Nothing
+        Left err -> do lift $ do putStrLn (err ++ " when decoding:")
+                                 print res
+                       return Nothing
         Right v -> return v
   where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
         auth = Bearer token

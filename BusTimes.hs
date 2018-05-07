@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -frefinement-level-hole-fits=2 -fno-max-valid-hole-fits
-                -funclutter-valid-hole-fits  -fno-max-refinement-hole-fits #-}
 {-# LANGUAGE OverloadedStrings, DeriveAnyClass, DeriveGeneric,
              TypeSynonymInstances, DuplicateRecordFields #-}
 module BusTimes where
