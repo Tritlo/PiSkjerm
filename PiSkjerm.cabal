@@ -15,6 +15,10 @@ build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=2.0
 
+flag debug
+  description:      Turn on debug messages
+  default:          False
+
 executable PiSkjerm
   main-is:             Main.hs
   other-modules:       BusTimes, InkyPhat

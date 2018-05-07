@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 module InkyPhat (
     runInky, InkyIO,
     -- commands
@@ -43,9 +44,16 @@ pyGetTime = do d <- readString "datetime.now().strftime('%Y-%m-%d')"
 sendCommand :: Text -> InkyIO ()
 sendCommand cmd =
     do (stdin, _) <- ask
-       lift $ do print cmd
-                 hPutStrLn stdin cmd
+       dlog cmd
+       lift $ do hPutStrLn stdin cmd
                  hFlushAll stdin
+
+dlog :: Text -> InkyIO ()
+# if debug
+dlog = putStrLn
+# else
+dlog _ = return ()
+#endif
 
 readValue :: Read a => Text -> InkyIO a
 readValue = fmap (read . unpack) . readString
@@ -56,7 +64,7 @@ readString cmd =
      lift $ hFlushAll stdout
      sendCommand $ "print(" <> cmd <> ")"
      val <- lift $ hGetLine stdout
-     lift $ putStrLn val
+     dlog val
      return val
 
 
@@ -118,11 +126,9 @@ setRotation :: Int -> InkyIO ()
 setRotation rot = sendCommand $ "inkyphat.set_rotation(" <> (pack $ show rot) <> ")"
 
 image :: Text -> Text -> InkyIO Image
-image name loc = do sendCommand $ T.concat [ name
-                                           , " = "
+image name loc = do sendCommand $ T.concat [ name , " = "
                                            , "inkyphat.Image.open('"
-                                           , loc
-                                           , "')"]
+                                           , loc , "')"]
                     return name
 
 

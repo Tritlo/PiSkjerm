@@ -16,8 +16,6 @@ import qualified Data.Text as T
 import Control.Concurrent
 import Data.Text.Encoding as E
 
-import Prelude hiding (intercalate)
-import Debug.Trace
 
 löviksVägen :: BusStop
 löviksVägen = 9021014004663000
@@ -59,19 +57,19 @@ rightpad c i n = i ++ replicate (n - length i) c
 
 renderBusLine :: TimeOfDay -> BusLine -> Text
 renderBusLine now bl@(BL _ _ dp) =
-   T.unwords $ map to5 $ [(displayNames bl <> ":")] <> dpts
+   T.unwords $ map to5 $ [displayNames bl <> ":"] <> dpts
  where to5 s = leftpad ' ' s 5
        dpts = rightpad "-" (map toDp dp) 2
        toDp t = msg 
          where mins = floor (lt - nowSecs) `div` 60
-               msg = if mins > 0 then (pack $ show mins) <> "min" else "Núna!"
+               msg = if mins > 0 then pack (show mins) <> "min" else "Núna!"
                lt = timeOfDayToTime $ read @TimeOfDay (t <> ":00")
                nowSecs = timeOfDayToTime now
 
 printBusTimes :: [Text] -> InkyIO ()
 printBusTimes msgs =
   do (inkyW, inkyH) <- dimensions
-     let (x,y) = (2, (inkyH `div` 2 - fontheight*(length msgs) `div` 2))
+     let (x,y) = (2, inkyH `div` 2 - fontheight * length msgs `div` 2)
          pr (m,i) = text pos m Nothing Nothing  
           where pos = (x, y + i*(fontheight + linespace))
      mapM_ pr $ zip msgs [0.. ]
@@ -124,7 +122,7 @@ pyGetBusTimes (date, time) stop token =
         Left err -> lift $ print err >> return Nothing
         Right v -> return v
   where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
-        auth = (Bearer token)
+        auth = Bearer token
         params = [("id", pack $ show stop)
                  , ("maxDeparturesPerLine", pack $ show 2)
                  , ("format","json")
@@ -137,12 +135,11 @@ loop :: Image -> InkyIO ()
 loop img =
   do (date, time) <- pyGetTime
      token <- fmap access_token <$> pyGetToken
-     case token of 
+     case token of
        Just token ->
          do stops <- catMaybes <$>
                        mapM (flip (pyGetBusTimes (date,time)) token)
                          [löviksVägen, hovåsNedre]
-            lift $ print stops
             let now = read @TimeOfDay ( unpack time ++ ":00")
                 interesting = interestingLines $ concatMap getLines stops
                 busTimes = map (renderBusLine now) interesting
