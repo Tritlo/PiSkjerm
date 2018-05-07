@@ -1,6 +1,7 @@
-{- OPTIONS_GHC -frefinement-level-hole-fits=2 -fno-max-valid-hole-fits
-                -funclutter-valid-hole-fits  -fno-max-refinement-hole-fits -}
-{-# LANGUAGE OverloadedStrings, DeriveAnyClass, DeriveGeneric, TypeSynonymInstances, DuplicateRecordFields #-}
+{-# OPTIONS_GHC -frefinement-level-hole-fits=2 -fno-max-valid-hole-fits
+                -funclutter-valid-hole-fits  -fno-max-refinement-hole-fits #-}
+{-# LANGUAGE OverloadedStrings, DeriveAnyClass, DeriveGeneric,
+             TypeSynonymInstances, DuplicateRecordFields #-}
 module BusTimes where
 
 import System.Environment
@@ -57,8 +58,6 @@ authToken key secret = encodeToken $ key ++ ":" ++ secret
         result = unpack b64ed
 
 -- Now, let's try to fetch a token!
--- We know that we want a get request with some auth header, but how do we
--- get these options? Let's ask GHC:
 
 data TokenResponse = TR { scope :: String
                         , token_type :: String
@@ -95,14 +94,12 @@ data BusLine = BL { name :: String
 
 getLines :: BusResponse -> [BusLine]
 getLines (BR (DB dep)) = concatMap getLine names
-  where 
-    names = nub $ map sname dep
-    getLine name = map toLine tracks
-      where 
-        dtrack = track :: Departure -> String
-        tracks = nub $ map dtrack $ filter ((== name) . sname) dep
-        -- filter fusion, yay!
-        getTrack tr = filter ((== name) . sname)
-                        . filter ((== tr) . dtrack )
-        concreteTime d = case rtTime d of Just t -> t; _ -> time d
-        toLine tr = BL name tr $ map concreteTime $ getTrack tr dep
+  where names = nub $ map sname dep
+        getLine name = map toLine tracks
+          where dtrack = track :: Departure -> String
+                tracks = nub $ map dtrack $ filter ((== name) . sname) dep
+                -- filter fusion, yay!
+                getTrack tr = filter ((== name) . sname)
+                                . filter ((== tr) . dtrack )
+                concreteTime d = case rtTime d of Just t -> t; _ -> time d
+                toLine tr = BL name tr $ map concreteTime $ getTrack tr dep

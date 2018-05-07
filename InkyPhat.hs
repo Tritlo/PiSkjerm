@@ -12,7 +12,7 @@ module InkyPhat (
 
     -- Python networking hack
     , AuthHeader (..), urlRequest, pyGetTime
-    ) where 
+    ) where
 
 
 import System.Process
@@ -109,10 +109,12 @@ instance InkyPhatVal Color where
   toIPVal Red   = "inkyphat.RED"
 
 -- We only have the one font for now
-data Font = Font Int 
+data Font = Font Int
 
 instance InkyPhatVal Font where
-  toIPVal (Font a) = "inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P," <>  (pack $ show a) <>")"
+  toIPVal (Font a) =
+    "inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P,"
+      <> (pack $ show a) <>")"
 
 display :: InkyIO ()
 display = sendCommand "inkyphat.show()"
@@ -123,22 +125,22 @@ clear = sendCommand "inkyphat.clear()"
 type Image = Text
 
 setRotation :: Int -> InkyIO ()
-setRotation rot = sendCommand $ "inkyphat.set_rotation(" <> (pack $ show rot) <> ")"
+setRotation rot =
+  sendCommand $ "inkyphat.set_rotation(" <> (pack $ show rot) <> ")"
 
 image :: Text -> Text -> InkyIO Image
-image name loc = do sendCommand $ T.concat [ name , " = "
-                                           , "inkyphat.Image.open('"
-                                           , loc , "')"]
-                    return name
+image name loc =
+  do sendCommand $ name <> " = inkyphat.Image.open('" <> loc <> "')"
+     return name
 
 
 paste :: Image -> (Int, Int) -> InkyIO ()
-paste img loc = 
+paste img loc =
   sendCommand $ intercalate "," $ ["inkyphat.paste(" <> img
                                   , (pack $ show loc) <> ")"]
 
 text :: (Int, Int) -> Text -> Maybe Color -> Maybe Font -> InkyIO ()
-text xy text color font = 
+text xy text color font =
     sendCommand $ intercalate "," ["inkyphat.text(" <> (pack $ show xy)
                                   , "'" <> text <> "'"
                                   , toIPVal col
@@ -152,12 +154,14 @@ size img = readValue $ "(" <> img <> ".size[0], " <> img <> ".size[1])"
 dimensions :: InkyIO (Int, Int)
 dimensions = readValue "(inkyphat.WIDTH, inkyphat.HEIGHT)"
 
-runInky :: InkyIO a -> IO a 
+runInky :: InkyIO a -> IO a
 runInky action =
-  do (Just stdin, Just stdout , Just std_err, proc) <- createProcess $ cp { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
+  do (Just stdin, Just stdout , Just stderr, proc)
+        <- createProcess $ cp { std_in = CreatePipe, std_out = CreatePipe
+                              , std_err = CreatePipe }
      r <- flip runReaderT (stdin, stdout) $
             do mapM_ sendCommand initialCommands
                action
-     mapM_ hClose [stdin, stdout]
+     mapM_ hClose [stdin, stdout, stderr]
      return r
   where cp = shell "python3 -i"
