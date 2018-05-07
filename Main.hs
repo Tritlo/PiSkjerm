@@ -11,11 +11,13 @@ import Data.Time
 import qualified Data.ByteString.Lazy.Char8 as B (pack)
 import Data.Text hiding ( map, concatMap, zip
                         , length, replicate, any
-                        , filter, null)
+                        , filter, null, take)
 import qualified Data.Text as T
 import Control.Concurrent
 import Data.Text.Encoding as E
 import System.Environment
+
+import Data.List (sort)
 
 # if PYTHON_HACKS
 import PythonHacks
@@ -55,39 +57,12 @@ linespace :: Int
 linespace = 2
 
 
-displayNames :: BusLine -> Text
-displayNames (BL "82" "A" _) = "82"
-displayNames (BL "82" "B" _) = "82B"
-displayNames (BL "ROSA" _ _) = "ROSA"
-displayNames (BL "158" _ _) = "158"
-displayNames _ = "??"
-
-interestingLines :: [BusLine] -> [BusLine]
-interestingLines lines = filter isInteresting lines
- where no158A = not $ any (\(BL n t _) -> (n == "158" && t == "A")) lines
-       isInteresting (BL n t _ ) =
-           (n == "82" && t == "A")
-        || (n == "82" && t == "B" && no158A)
-        || (n == "ROSA" && t == "A")
-        || (n == "158" && t == "A")
-
 -- From Gabriel Gonzalez's tweet.
 leftpad :: Char -> Text -> Int -> Text
 leftpad c i n = T.replicate (n - T.length i) (singleton c) <> i
 
 rightpad :: a -> [a] -> Int -> [a]
 rightpad c i n = i ++ replicate (n - length i) c 
-
-renderBusLine :: TimeOfDay -> BusLine -> Text
-renderBusLine now bl@(BL _ _ dp) =
-   T.unwords $ map to5 $ [displayNames bl <> ":"] <> dpts
- where to5 s = leftpad ' ' s 5
-       dpts = rightpad "-" (map toDp dp) 2
-       toDp t = msg 
-         where mins = floor (lt - nowSecs) `div` 60
-               msg = if mins > 0 then pack (show mins) <> "min" else "Núna!"
-               lt = timeOfDayToTime $ read @TimeOfDay (t <> ":00")
-               nowSecs = timeOfDayToTime now
 
 printBusTimes :: [Text] -> InkyIO ()
 printBusTimes msgs =
@@ -128,6 +103,40 @@ updateDisplay img times
       ; printLogo img
       ; display }
 
+data KnownLine = B82 [String]
+               | BRosa [String]
+               | B158 [String]
+               | B82B [String] deriving (Eq, Ord)
+
+toKnownLine :: BusLine -> Maybe KnownLine
+toKnownLine (BL "82" "A" d) = Just $ B82 d
+toKnownLine (BL "82" "B" d) = Just $ B82B d
+toKnownLine (BL "ROSA" "A" d) = Just $ BRosa d
+toKnownLine (BL "158" "A" d) = Just $ B158 d
+toKnownLine (BL n t d) = Nothing
+
+knownDepartures :: KnownLine -> [String]
+knownDepartures (B82 d) = d
+knownDepartures (B82B d) = d
+knownDepartures (BRosa d) = d
+knownDepartures (B158 d) = d
+
+instance Show KnownLine where
+  show (B82 _) = "82"
+  show (B82B _) = "82B"
+  show (BRosa _) = "ROSA"
+  show (B158 _) = "158"
+
+renderLine :: TimeOfDay -> KnownLine -> Text
+renderLine now kl =
+   T.unwords $ map to5 $ [pack (show kl) <> ":"] <> dpts
+ where to5 s = leftpad ' ' s 5
+       dpts = rightpad "-" (map toDp $ knownDepartures kl) 2
+       toDp t = if mins > 0 then pack (show mins) <> "min" else "Núna!"
+         where mins = floor (lt - nowSecs) `div` 60
+               lt = timeOfDayToTime $ read @TimeOfDay (t <> ":00")
+               nowSecs = timeOfDayToTime now
+
 loop :: Image -> InkyIO ()
 loop img =
   do (date, time) <- getDateTime
@@ -136,8 +145,9 @@ loop img =
        Just token ->
          do stops <- catMaybes <$> mapM (getBusTimes token) nearby
             let now = read @TimeOfDay ( unpack time ++ ":00")
-                interesting = interestingLines $ concatMap getLines stops
-                busTimes = map (renderBusLine now) interesting
+                toDisplay = take 3 $ sort $ mapMaybe toKnownLine
+                              $ concatMap getLines stops
+                busTimes = map (renderLine now) toDisplay
                 msg = if null busTimes
                         then ["Engar ferðir núna!"]
                         else busTimes
