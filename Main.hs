@@ -19,6 +19,12 @@ import System.Environment
 
 import Data.List (sort)
 
+
+-- We have a flag in the cabal file that allows us to chose between using the
+-- python interpreter for time and network queries or using a native haskell
+-- implementation. However, the native implementation segfaults when run on
+-- the device, due to a bug in the cross-compilation toolchain, hence the
+-- possiblity to choose.
 # if PYTHON_HACKS
 import PythonHacks
 # else
@@ -82,6 +88,7 @@ printTime = do (date, time) <- getDateTime
 printName :: InkyIO ()
 printName = do (inkyW, _) <- dimensions
                let pos = ((inkyW - 14*fontwidth) `div` 2,2)
+               -- Strætóferðir means "Bus Trips"
                text pos "Strætóferðir" (Just Red) (Just (Font 14))
 
 printLogo :: Image -> InkyIO ()
@@ -91,6 +98,7 @@ printLogo img
       let (vx,vy) =  ((inkyW - 10*14 - logoW -10) `div` 2, inkyH -2-14)
           posText = (vx + logoW+2, vy -4)
           posLogo = (vx, vy-logoH+14-2)
+      -- Västtrafik is the name of the Gothenburg transport authority.
       text posText "Västtrafik" (Just Red) (Just (Font 14))
       paste img posLogo
 
@@ -103,11 +111,20 @@ updateDisplay img times
       ; printLogo img
       ; display }
 
+-- Note [Known Lines]
+-- We only want to show known lines, i.e. those that we take from our house,
+-- and we want to display 82 first, then Rosa, and then the others.
+-- Additionally, we want to show the 158 when it is running (in the morning),
+-- but otherwise show the 82 going to Brottkärr, since we can only fit 3
+-- lines comfortably on the display at once. This is why we do `take 3`
+-- when choosing what to output, which selects the 158 if availble, but
+-- the 82B otherwise.
 data KnownLine = B82 [String]
                | BRosa [String]
                | B158 [String]
                | B82B [String] deriving (Eq, Ord)
 
+-- These are the lines going in the right direction that we are interested in.
 toKnownLine :: BusLine -> Maybe KnownLine
 toKnownLine (BL "82" "A" d) = Just $ B82 d
 toKnownLine (BL "82" "B" d) = Just $ B82B d
@@ -132,7 +149,12 @@ renderLine now kl =
    T.unwords $ map to5 $ [pack (show kl) <> ":"] <> dpts
  where to5 s = leftpad ' ' s 5
        dpts = rightpad "-" (map toDp $ knownDepartures kl) 2
-       toDp t = if mins > 0 then pack (show mins) <> "min" else "Núna!"
+       -- We want to show how many minutes there are until the bus departs.
+       -- Note that we check for > 0, since the date might be in the past
+       -- if the bus is waiting at the stop or too much time has passed
+       -- since the request was made.
+       toDp t = if mins > 0 then pack (show mins) <> "min"
+                else "Núna!" -- "Núna" means "Right now".
          where mins = floor (lt - nowSecs) `div` 60
                lt = timeOfDayToTime $ read @TimeOfDay (t <> ":00")
                nowSecs = timeOfDayToTime now
@@ -140,17 +162,22 @@ renderLine now kl =
 loop :: Image -> InkyIO ()
 loop img =
   do (date, time) <- getDateTime
+     -- We could save the token and re-use it if it hasn't expired, but since
+     -- the performance is limited by the screen refresh time anyway, we don't
+     -- bother.
      mb_token <- fmap access_token <$> getToken
      case mb_token of
        Just token ->
          do stops <- catMaybes <$> mapM (getBusTimes token) nearby
             let now = read @TimeOfDay ( unpack time ++ ":00")
+                -- See Note [Known Lines]
                 toDisplay = take 3 $ sort $ mapMaybe toKnownLine
                               $ concatMap getLines stops
                 busTimes = map (renderLine now) toDisplay
-                msg = if null busTimes
-                        then ["Engar ferðir núna!"]
-                        else busTimes
+                -- "Engar ferðir núna" means "No trips right now", which we
+                -- display when the buses have stopped running (usually quite
+                -- late at night).
+                msg = if null busTimes then ["Engar ferðir núna!"] else busTimes
             updateDisplay img msg
        _ -> return ()
      lift $ threadDelay $ 60 * 1000 * 1000
