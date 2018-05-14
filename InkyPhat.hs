@@ -13,15 +13,15 @@ module InkyPhat ( runInky, InkyIO
 
 import System.Process
 import Control.Concurrent
-import GHC.IO.Handle (Handle, hClose, hFlush, hFlushAll)
+import GHC.IO.Handle (Handle, hClose, hFlush, hFlushAll, hWaitForInput)
 import Data.Maybe (fromMaybe)
 import Control.Monad (join)
 
 import Control.Monad.Reader
-import Data.Text hiding (map, null)
+import Data.Text
 import qualified Data.Text as T
 
-import Prelude hiding (hPutStr, hPutStrLn, hGetLine, putStrLn,)
+import Prelude hiding ( hPutStrLn, hGetLine )
 import Data.Text.IO
 
 type InkyIO = ReaderT (Handle, Handle) IO
@@ -50,7 +50,9 @@ readString cmd =
   do (stdin, stdout) <- ask
      lift $ hFlushAll stdout
      sendCommand $ "print(" <> cmd <> ")"
-     val <- lift $ hGetLine stdout
+     --- We wait at max 30 seconds for output
+     val <- lift $ do  hasOutput <- hWaitForInput stdout (30*1000)
+                       if hasOutput then hGetLine stdout else return ""
      dlog val
      return val
 
@@ -71,12 +73,12 @@ instance InkyPhatVal Color where
   toIPVal Red   = "inkyphat.RED"
 
 -- We only have the one font for now
-data Font = Font Int
+newtype Font = Font Int
 
 instance InkyPhatVal Font where
   toIPVal (Font a) =
     "inkyphat.ImageFont.truetype(inkyphat.fonts.PressStart2P,"
-      <> (pack $ show a) <>")"
+      <> pack (show a) <>")"
 
 display :: InkyIO ()
 display = sendCommand "inkyphat.show()"
@@ -88,7 +90,7 @@ type Image = Text
 
 setRotation :: Int -> InkyIO ()
 setRotation rot =
-  sendCommand $ "inkyphat.set_rotation(" <> (pack $ show rot) <> ")"
+  sendCommand $ "inkyphat.set_rotation(" <> pack (show rot) <> ")"
 
 image :: Text -> Text -> InkyIO Image
 image name loc =
@@ -98,12 +100,12 @@ image name loc =
 
 paste :: Image -> (Int, Int) -> InkyIO ()
 paste img loc =
-  sendCommand $ intercalate "," $ ["inkyphat.paste(" <> img
-                                  , (pack $ show loc) <> ")"]
+  sendCommand $ intercalate ","  ["inkyphat.paste(" <> img
+                                 , pack (show loc) <> ")"]
 
 text :: (Int, Int) -> Text -> Maybe Color -> Maybe Font -> InkyIO ()
 text xy text color font =
-    sendCommand $ intercalate "," ["inkyphat.text(" <> (pack $ show xy)
+    sendCommand $ intercalate "," ["inkyphat.text(" <> pack (show xy)
                                   , "'" <> text <> "'"
                                   , toIPVal col
                                   , toIPVal fon <> ")" ]
