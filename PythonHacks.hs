@@ -15,6 +15,7 @@ import Prelude hiding (hPutStr, hPutStrLn, hGetLine, putStrLn)
 import qualified Data.Aeson as JSON
 
 import Control.Monad.Reader
+import Control.Monad.Except
 
 import BusTimes
 import InkyPhat
@@ -47,7 +48,7 @@ urlRequest url params auth body
 -- unless the TZ variable is set to a non-file base timezone.
 -- Use these if you must.
 pyGetToken :: InkyIO (Maybe TokenResponse)
-pyGetToken = do (key, secret) <- lift getAuthCredentials
+pyGetToken = do (key, secret) <- liftIO getAuthCredentials
                 let auth = authToken key secret
                     url = "https://api.vasttrafik.se/token"
                     body = "grant_type=client_credentials"
@@ -58,7 +59,7 @@ pyGetBusTimes token stop =
    do (date, time) <- pyGetDateTime
       res <- E.encodeUtf8 <$> urlRequest url (params date time) (Bearer token)  ""
       case JSON.eitherDecodeStrict res of
-        Left err -> lift $ print err >> return Nothing
+        Left err -> throwError $ ValueParseError (pack err)
         Right v -> return v
   where url = "https://api.vasttrafik.se/bin/rest.exe/v2/departureBoard"
         auth = Bearer token

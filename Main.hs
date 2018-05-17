@@ -18,6 +18,7 @@ import Data.Text.Encoding as E
 import System.Environment
 
 import Data.List (sort)
+import Control.Monad.Except
 
 
 -- We have a flag in the cabal file that allows us to chose between using the
@@ -180,8 +181,8 @@ loop img =
                 msg = if null busTimes then ["Engar ferðir núna!"] else busTimes
             updateDisplay img msg
        _ -> return ()
-     lift $ threadDelay $ 60 * 1000 * 1000
+     liftIO $ threadDelay $ 60 * 1000 * 1000
      loop img
 
 main :: IO ()
-main = runInky $ setup >>= loop
+main = runInkyLoop $ setup >>= loop
