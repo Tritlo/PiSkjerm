@@ -40,9 +40,9 @@ getToken = pyGetToken
 getDateTime = pyGetDateTime
 getBusTimes = pyGetBusTimes
 #else
-getToken = lift hsGetToken
-getDateTime = lift hsGetDateTime
-getBusTimes t s = lift (hsGetBusTimes t s)
+getToken = liftIO hsGetToken
+getDateTime = liftIO hsGetDateTime
+getBusTimes t s = liftIO (hsGetBusTimes t s)
 #endif
 
 

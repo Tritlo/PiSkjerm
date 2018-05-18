@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TypeApplications #-}
 module ReqNetworking (
   hsGetToken, hsGetDateTime, hsGetBusTimes
 ) where
@@ -24,11 +24,12 @@ config = def {httpConfigRetryPolicy = delay }
     -- We default to delaying for 5 sec and trying 10 times.
     delay :: RetryPolicy
     delay = constantDelay (5000*1000) <> limitRetries 5
+
 hsGetToken :: IO (Maybe TokenResponse)
 hsGetToken = fmap Just $ runReq config $
   do (key, secret) <- liftIO getAuthCredentials
      let auth = basicAuth (B.pack key) (B.pack secret)
-         url = https "api.vasttrafik.se" /: "token"
+         url = (/~) @[Char] (https "api.vasttrafik.se") "token"
          -- We need a body, but how? Let's ask!
          body :: ReqBodyBs
          -- body = _ ("grant_type=client_credentials" :: ByteString)
