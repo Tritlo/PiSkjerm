@@ -26,6 +26,8 @@ import qualified Data.Text as T
 import Prelude hiding ( hPutStrLn, hGetLine )
 import Data.Text.IO
 
+import System.IO.Error
+
 import Text.Read (readEither)
 
 data InkyException = ValueParseError Text
@@ -74,7 +76,8 @@ readString cmd =
  where
     readWithTimeout :: Handle -> Int -> IO (Maybe Text)
     readWithTimeout handle timeout
-     = do hasOutput <- hWaitForInput handle timeout
+     = do hasOutput <- flip catchIOError (\_->return False)
+                        $ hWaitForInput handle timeout
           if hasOutput then Just <$> hGetLine handle
                        else return Nothing
 initialCommands :: [Text]
